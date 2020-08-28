@@ -1,4 +1,5 @@
 const uuid = require("uuid");
+const { validationResult } = require('express-validator');
 
 const HttpError = require('../models/http-error');
 
@@ -7,16 +8,27 @@ const DUMMY_HOSPITALS = [
         id: "0",
         name: "Good Care Of Your Family",
         image: "/assets/images/baby-1150109.jpg",
+        address: "298, Monseigneur Guilloux",
+        coordinates: {
+            lat: 40.85455662,
+            lng: 78.51587887
+        },
         elevation: 1233,
         featured: false,
         creator: "u1",
         description:
             "This is your favorite hospital. We are here to take care of you and all your family "
+        
     },
     {
         id: "1",
         name: "Your Health Is Our Priority",
         image: "/assets/images/smiling_8930.jpg",
+        address: "37, Rue Borno, PV",
+        coordinates: {
+            lat: 40.85455662,
+            lng: 78.51587887
+        },
         elevation: 877,
         featured: false,
         creator: "u2",
@@ -43,29 +55,36 @@ const getHospitalById = (req, res, next) => {
 // function getHospitalById() = {...}
 // const getHospitalById = function() {...}
 
-const getHospitalByUserId = (req, res, next) => {
+const getHospitalsByUserId = (req, res, next) => {
     const userId = req.params.uid;
 
-    const hospital = DUMMY_HOSPITALS.find(hosp => {
+    const hospitals = DUMMY_HOSPITALS.filter(hosp => {
         return hosp.creator === userId;
     });
 
-    if (!hospital) {
-        return next(new HttpError('Could not find the hospital for the provided user id', 404));
+    if (!hospitals || hospitals.length === 0) {
+        return next(new HttpError('Could not find hospital for the provided user id', 404));
     }
 
-    res.json({ hospital });
+    res.json({ hospitals });
 };
 
 const createHospital = (req, res, next) => {
-    const { name, image, elevation, featured, creator, description } = req.body;
+    const { name, image, address, coordinates, elevation, featured, creator, description } = req.body;
     // const name = req.body.name
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        console.log(errors);
+        throw new HttpError('Invalid input, please check your data.', 422);
+    }
 
     // What we need to have in the body?
     const createdHospital = {
         id: uuid.v4(),
         name,
         image,
+        address,
+        location: coordinates,
         elevation,
         featured,
         creator,
@@ -77,6 +96,31 @@ const createHospital = (req, res, next) => {
     res.status(201).json({ hospital: createdHospital });
 };
 
+// Add hospital in the array list
+const updateHospital = (req, res, next) => {
+     const { name, creator, description } = req.body;
+     const hospitalId = req.params.hid;
+
+     const updatedHospital = { ...DUMMY_HOSPITALS.find(hosp => hosp.id === hospitalId) };
+     const hospitalIndex = DUMMY_HOSPITALS.findIndex(hosp => hosp.id === hospitalId);
+     
+     updatedHospital.name = name;
+     updatedHospital.creator = creator;
+     updatedHospital.description = description;
+
+     DUMMY_HOSPITALS[hospitalIndex] = updatedHospital;
+
+     res.status(200).json({ hospital: updatedHospital });
+};
+
+const deleteHospital = (req, res, next) => {
+    const hospitalId = req.params.hid;
+    DUMMY_HOSPITALS = DUMMY_HOSPITALS.filter(hosp => hosp.id !== hospitalId);
+    res.status(200).json({ message: "Deleted hospital." })
+};
+
 exports.getHospitalById = getHospitalById;
-exports.getHospitalByUserId = getHospitalByUserId;
+exports.getHospitalsByUserId = getHospitalsByUserId;
 exports.createHospital = createHospital;
+exports.updateHospital = updateHospital;
+exports.deleteHospital = deleteHospital; 
