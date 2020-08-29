@@ -20,7 +20,10 @@ router.post(
   hospitalControllers.createHospital
 );
 
-router.patch("/:hid", hospitalControllers.updateHospital);
+router.patch("/:hid", [
+  check("name").not().isEmpty(),
+  check("description").isLength({ min: 5 }),
+], hospitalControllers.updateHospital);
 
 router.delete("/:hid", hospitalControllers.deleteHospital);
 

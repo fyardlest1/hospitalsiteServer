@@ -2,6 +2,7 @@ const uuid = require("uuid");
 const { validationResult } = require('express-validator');
 
 const HttpError = require('../models/http-error');
+const getCoordsForAddress = require('../util/location');
 
 const DUMMY_HOSPITALS = [
     {
@@ -46,7 +47,7 @@ const getHospitalById = (req, res, next) => {
 
     if (!hospital) {
         // return next(new HttpError('Could not find the hospital for the provided id', 404));
-        throw new HttpError('Could not find the hospital for the provided id', 404);
+        return next(new HttpError('Could not find the hospital for the provided id', 404));
     }
 
     res.json({ hospital }); // { hospital } => { hospital: hospital }
@@ -69,13 +70,20 @@ const getHospitalsByUserId = (req, res, next) => {
     res.json({ hospitals });
 };
 
-const createHospital = (req, res, next) => {
-    const { name, image, address, coordinates, elevation, featured, creator, description } = req.body;
-    // const name = req.body.name
+const createHospital = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        console.log(errors);
-        throw new HttpError('Invalid input, please check your data.', 422);
+        return next(new HttpError('Invalid input, please check your data.', 422));
+    }
+
+    const { name, image, address, elevation, featured, creator, description } = req.body;
+    // const name = req.body.name
+
+    let coordinates;
+    try {
+        coordinates = await getCoordsForAddress(address);
+    } catch (error) {
+        return next(error);
     }
 
     // What we need to have in the body?
@@ -98,14 +106,19 @@ const createHospital = (req, res, next) => {
 
 // Add hospital in the array list
 const updateHospital = (req, res, next) => {
-     const { name, creator, description } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        throw new HttpError('Invalid input, please check your data.', 422);
+    }
+
+     const { name, address, description } = req.body;
      const hospitalId = req.params.hid;
 
      const updatedHospital = { ...DUMMY_HOSPITALS.find(hosp => hosp.id === hospitalId) };
      const hospitalIndex = DUMMY_HOSPITALS.findIndex(hosp => hosp.id === hospitalId);
      
      updatedHospital.name = name;
-     updatedHospital.creator = creator;
+     updatedHospital.address = address;
      updatedHospital.description = description;
 
      DUMMY_HOSPITALS[hospitalIndex] = updatedHospital;
@@ -115,6 +128,11 @@ const updateHospital = (req, res, next) => {
 
 const deleteHospital = (req, res, next) => {
     const hospitalId = req.params.hid;
+
+    if (!DUMMY_HOSPITALS.find(h => h.id === hospitalId)) {
+        throw new HttpError('Could not find the hospital you want to delete.', 404)
+    }
+
     DUMMY_HOSPITALS = DUMMY_HOSPITALS.filter(hosp => hosp.id !== hospitalId);
     res.status(200).json({ message: "Deleted hospital." })
 };
