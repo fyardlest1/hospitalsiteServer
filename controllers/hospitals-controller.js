@@ -1,8 +1,9 @@
-const uuid = require("uuid");
+// const uuid = require("uuid");
 const { validationResult } = require('express-validator');
 
 const HttpError = require('../models/http-error');
 const getCoordsForAddress = require('../util/location');
+const Hospital = require('../models/hospital');
 
 const DUMMY_HOSPITALS = [
     {
@@ -87,19 +88,24 @@ const createHospital = async (req, res, next) => {
     }
 
     // What we need to have in the body?
-    const createdHospital = {
-        id: uuid.v4(),
-        name,
-        image,
-        address,
-        location: coordinates,
-        elevation,
-        featured,
-        creator,
-        description
-    };
+    const createdHospital = new Hospital({
+      name,
+      image:
+        "https://static.toiimg.com/thumb/72975551.cms?width=680&height=512&imgsize=881753",
+      address,
+      elevation,
+      featured,
+      location: coordinates,
+      creator,
+      description,
+    });
 
-    DUMMY_HOSPITALS.push(createdHospital); // unshift(createdHospital);
+    try {
+    await createdHospital.save();
+    } catch (e) {
+        const err = new HttpError("Creating Hospital failed, please try again.", 500);
+        return next(err);
+    }
 
     res.status(201).json({ hospital: createdHospital });
 };
