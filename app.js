@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 
 const hospitalsRouter = require('./routes/hospitals');
 const userRouter = require('./routes/users');
-
 const HttpError = require('./models/http-error');
 
 const app = express();
@@ -30,7 +29,8 @@ app.use((error, req, res, next) => {
 
 mongoose
   .connect(
-    "mongodb+srv://fyardlest:YoodY123789@cluster0.avbyx.mongodb.net/hospitals?retryWrites=true&w=majority"
+    "mongodb+srv://fyardlest:YoodY123789@cluster0.avbyx.mongodb.net/hospitals?retryWrites=true&w=majority",
+    { useNewUrlParser: true }
   )
   .then(() => {
     app.listen(5000);

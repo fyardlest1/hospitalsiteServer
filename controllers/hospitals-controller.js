@@ -4,6 +4,7 @@ const { validationResult } = require('express-validator');
 const HttpError = require('../models/http-error');
 const getCoordsForAddress = require('../util/location');
 const Hospital = require('../models/hospital');
+const hospital = require('../models/hospital');
 
 const DUMMY_HOSPITALS = [
     {
@@ -39,36 +40,55 @@ const DUMMY_HOSPITALS = [
     }
 ];
 
-const getHospitalById = (req, res, next) => {
+const getHospitalById = async (req, res, next) => {
     const hospitalId = req.params.hid;
-
-    const hospital = DUMMY_HOSPITALS.find(hosp => {
-        return hosp.id === hospitalId;
-    });
+    
+    let hospital;
+    try {
+      hospital = await Hospital.findById(hospitalId);
+    } catch (err) {
+      const error = new HttpError(
+        "Something went wrong, could not find an hospital.",
+        500
+      );
+      return next(error);
+    }
 
     if (!hospital) {
         // return next(new HttpError('Could not find the hospital for the provided id', 404));
-        return next(new HttpError('Could not find the hospital for the provided id', 404));
+        const error = new HttpError('Could not find the hospital for the provided id', 404);
+        return next(error);
     }
 
-    res.json({ hospital }); // { hospital } => { hospital: hospital }
+    res.json({ hospital: hospital.toObject( { getters: true } ) }); // { hospital } => { hospital: hospital }
 };
 
 // function getHospitalById() = {...}
 // const getHospitalById = function() {...}
 
-const getHospitalsByUserId = (req, res, next) => {
-    const userId = req.params.uid;
+const getHospitalsByUserId = async (req, res, next) => {
+  const userId = req.params.uid;
 
-    const hospitals = DUMMY_HOSPITALS.filter(hosp => {
-        return hosp.creator === userId;
-    });
+  let hospitals;
+  try {
+    hospitals = await hospital.find({ creator: userId });
+  } catch (err) {
+    const error = new HttpError(
+      "Fetching hospitals failed, please try again later",
+      500
+    );
+    return next(error);
+  }
 
-    if (!hospitals || hospitals.length === 0) {
-        return next(new HttpError('Could not find hospital for the provided user id', 404));
-    }
+  if (!hospitals || hospitals.length === 0) {
+    return next(
+      new HttpError("Could not find hospitals for the provided user id.", 404)
+    );
+  }
 
-    res.json({ hospitals });
+  res.json({
+    hospitals: hospitals.map((hospital) => hospital.toObject({ getters: true })),
+  });
 };
 
 const createHospital = async (req, res, next) => {
@@ -101,7 +121,7 @@ const createHospital = async (req, res, next) => {
     });
 
     try {
-    await createdHospital.save();
+        await createdHospital.save();
     } catch (e) {
         const err = new HttpError("Creating Hospital failed, please try again.", 500);
         return next(err);
@@ -111,7 +131,7 @@ const createHospital = async (req, res, next) => {
 };
 
 // Add hospital in the array list
-const updateHospital = (req, res, next) => {
+const updateHospital = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         throw new HttpError('Invalid input, please check your data.', 422);
@@ -120,27 +140,62 @@ const updateHospital = (req, res, next) => {
      const { name, address, description } = req.body;
      const hospitalId = req.params.hid;
 
-     const updatedHospital = { ...DUMMY_HOSPITALS.find(hosp => hosp.id === hospitalId) };
-     const hospitalIndex = DUMMY_HOSPITALS.findIndex(hosp => hosp.id === hospitalId);
+    let hospital;
+    try {
+        hospital = await Hospital.findById(hospitalId);
+    } catch (err) {
+        const error = new HttpError('Something went wrong, could not update hospital', 500);
+        return next(error);
+    }
      
-     updatedHospital.name = name;
-     updatedHospital.address = address;
-     updatedHospital.description = description;
+     hospital.name = name;
+     hospital.address = address;
+     hospital.description = description;
 
-     DUMMY_HOSPITALS[hospitalIndex] = updatedHospital;
+     try {
+        await hospital.save();
+     } catch (err) {
+        const error = new HttpError(
+          "Something went wrong, could not update hospital",
+          500
+        );
+        return next(error);
+     }
 
-     res.status(200).json({ hospital: updatedHospital });
+    //  DUMMY_HOSPITALS[hospitalIndex] = updatedHospital;
+
+     res.status(200).json({ hospital: hospital.toObject( { getters: true } ) });
 };
 
-const deleteHospital = (req, res, next) => {
+const deleteHospital = async (req, res, next) => {
     const hospitalId = req.params.hid;
 
-    if (!DUMMY_HOSPITALS.find(h => h.id === hospitalId)) {
-        throw new HttpError('Could not find the hospital you want to delete.', 404)
+    let hospital;
+    try {
+        hospital = await Hospital.findById(hospitalId);
+    } catch (err) {
+        const error = new HttpError('There is an error, we could not delete the hospital.', 500);
+        return next(error);
     }
+    res.status(200).json({ message: "Deleted hospital." });
 
-    DUMMY_HOSPITALS = DUMMY_HOSPITALS.filter(hosp => hosp.id !== hospitalId);
-    res.status(200).json({ message: "Deleted hospital." })
+    try {
+      await hospital.remove();
+    } catch (err) {
+      const error = new HttpError(
+        "There is an error, we could not delete the hospital.",
+        500
+      );
+      return next(error);
+    }
+    
+
+    // if (!DUMMY_HOSPITALS.find(h => h.id === hospitalId)) {
+    //     throw new HttpError('Could not find the hospital you want to delete.', 404)
+    // }
+
+    // DUMMY_HOSPITALS = DUMMY_HOSPITALS.filter(hosp => hosp.id !== hospitalId);
+    // res.status(200).json({ message: "Deleted hospital." })
 };
 
 exports.getHospitalById = getHospitalById;
